@@ -11,9 +11,10 @@ import time
 class Vertex:
     def __init__(self, position):
         self.position = position
+        self.closest_vertex = None
     
-    def add_closest_vertex(self, vertex):
-        self.vertex = vertex
+    def add_closest_vertex(self, closest_vertex):
+        self.closest_vertex = closest_vertex
 
 
 class RRT():
@@ -36,6 +37,11 @@ class RRT():
         self.xlim_max = 110
         self.ylim_min = -10
         self.ylim_max = 110
+
+        self.xbranch = np.array([[],
+                                 []])
+        self.ybranch = np.array([[],
+                                 []])
 
     def get_obstacles(self):
         '''
@@ -134,7 +140,36 @@ class RRT():
 
         return path
     
+    def extend(self, Graph, sample_vertex):
+        distance_array =[]
+        infeasible_count = 0
+        for vertex in Graph:
+            feasible = self.check_path_feasibility(vertex, sample_vertex)
+            distance = np.sqrt( (vertex.position[0] - sample_vertex.position[0])**2 + (vertex.position[1] - sample_vertex.position[1])**2 )
+            #Note which vertices are feasible and which are not
+            if feasible:
+                distance_array.append(distance)
+            else:
+                distance_array.append(np.inf)
+                infeasible_count+=1
 
+        if infeasible_count == len(Graph):
+            print("NO PATH TO VERTEX") 
+            return Graph
+        else:
+            i = np.argmin(distance_array)
+            sample_vertex.add_closest_vertex(Graph[i])
+            
+            #For visualization
+            new_xbranch = np.array([[sample_vertex.closest_vertex.position[0]],
+                                    [sample_vertex.position[0]]])
+            new_ybranch = np.array([[sample_vertex.closest_vertex.position[1]],
+                                    [sample_vertex.position[1]]])
+            # self.xbranch = np.hstack((self.xbranch, new_xbranch))
+            # self.ybranch = np.hstack((self.ybranch, new_ybranch))
+            self.ax.plot(new_xbranch, new_ybranch, color='black', linestyle='dashed')
+            Graph.append(sample_vertex)
+            return Graph
         
 
     #THE REST OF THE FUNCTIONS ARE JUST USED FOR VISUALIZATIONS
@@ -170,6 +205,17 @@ class RRT():
         plt.draw()
         plt.pause(0.01)
 
+    def visualize_branching(self):
+        '''
+        Used to see direct lines from origin to sample and sample to goal 
+        '''
+        
+        self.direct_line.set_data(self.xbranch,self.ybranch)
+        plt.draw()
+        plt.pause(0.01)
+
+    
+
 
 def main():
     
@@ -191,32 +237,40 @@ def main():
 
     i = 0
 
-    while i < 10:
-
+    while i < 100:
+        
+        #generate a new point to sample
         new_point = rrt.generate_rand_point()
-        rrt.visualize_random_point(new_point)
+        #check if the new point is feasible
         point_feasible = rrt.check_point_feasibility(new_point)
         new_point_vertex = Vertex(new_point)
-        path_origin_point_feasible = rrt.check_path_feasibility(origin_vertex, new_point_vertex)
-        path_point_goal_feasible = rrt.check_path_feasibility(new_point_vertex, goal_vertex)
-        rrt.visualize_direct_path(new_point_vertex)
-        if point_feasible:
-            print("POINT feasible")
-        else:
-            print("POINT not feasible")
-        if path_origin_point_feasible:
-            print("PATH ORIGIN -> POINT feasible")
-        else:
-            print("PATH ORIGIN -> POINT not feasible")
-        if path_point_goal_feasible:
-            print("PATH POINT -> GOAL feasible")
-        else:
-            print("PATH POINT -> GOAL not feasible")
+        # #Check and see if this new point can extended from origin
+        # path_origin_point_feasible = rrt.check_path_feasibility(origin_vertex, new_point_vertex)
+        # #Check and see if this new point can go directly to goal
+        # path_point_goal_feasible = rrt.check_path_feasibility(new_point_vertex, goal_vertex)
+        Graph = rrt.extend(GRAPH, new_point_vertex)
+        
+        rrt.visualize_random_point(new_point)
+        # rrt.visualize_branching()
+        # rrt.visualize_direct_path(new_point_vertex)
+        # if point_feasible:
+        #     print("POINT feasible")
+        # else:
+        #     print("POINT not feasible")
+        # if path_origin_point_feasible:
+        #     print("PATH ORIGIN -> POINT feasible")
+        # else:
+        #     print("PATH ORIGIN -> POINT not feasible")
+        # if path_point_goal_feasible:
+        #     print("PATH POINT -> GOAL feasible")
+        # else:
+        #     print("PATH POINT -> GOAL not feasible")
         
         print(" ")
         print("----------------------------------")
         print(" ")
-        time.sleep(5)
+        # time.sleep(4)
+        input("Press the Enter key to continue: ")
         i+=1
 
 
