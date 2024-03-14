@@ -12,9 +12,21 @@ class Vertex:
     def __init__(self, position):
         self.position = position
         self.closest_vertex = None
+        self.closest_vertex_i = None
+        self.origin = False
+        self.goal = False
     
     def add_closest_vertex(self, closest_vertex):
         self.closest_vertex = closest_vertex
+
+    def add_closest_vertex_i(self, closest_vertex_i):
+        self.closest_vertex_i = closest_vertex_i
+
+    def set_origin(self):
+        self.origin = True
+
+    def set_goal(self):
+        self.goal = True
 
 
 class RRT():
@@ -32,7 +44,8 @@ class RRT():
         self.scatter1 = self.ax.scatter([], [], color='green', marker='o')
         self.scatter2 = self.ax.scatter([], [], color='red', marker='o')
         self.scatter3 = self.ax.scatter([], [], color='black', marker='o')
-        self.direct_line, = self.ax.plot([], [], color='black', linestyle='dashed')
+        self.direct_line, = self.ax.plot([], [], color='black', linestyle='dashed',linewidth=.1)
+        self.path_line, = self.ax.plot([], [], color='green', linewidth=5)
         self.xlim_min = -10
         self.xlim_max = 110
         self.ylim_min = -10
@@ -159,6 +172,7 @@ class RRT():
         else:
             i = np.argmin(distance_array)
             sample_vertex.add_closest_vertex(Graph[i])
+            sample_vertex.add_closest_vertex_i(i)
             
             #For visualization
             new_xbranch = np.array([[sample_vertex.closest_vertex.position[0]],
@@ -171,6 +185,29 @@ class RRT():
             Graph.append(sample_vertex)
             return Graph
         
+    def check_finished(self, Graph):
+        '''
+        Checks to see if a sample can reach the goal directly
+        Parameters:
+        new_point_vertex (Vertex): the newest sampled vertex
+        '''
+        graph_length = len(Graph)-1
+        new_point_vertex = Graph[graph_length]
+        finished = self.check_path_feasibility(new_point_vertex, self.goal)
+
+        if finished:
+            self.goal.add_closest_vertex(new_point_vertex)
+            self.goal.add_closest_vertex_i(graph_length)
+            Graph.append(self.goal)
+            #For visualization
+            new_xbranch = np.array([[self.goal.closest_vertex.position[0]],
+                                    [self.goal.position[0]]])
+            new_ybranch = np.array([[self.goal.closest_vertex.position[1]],
+                                    [self.goal.position[1]]])
+            # self.xbranch = np.hstack((self.xbranch, new_xbranch))
+            # self.ybranch = np.hstack((self.ybranch, new_ybranch))
+            self.ax.plot(new_xbranch, new_ybranch, color='black', linestyle='dashed')
+        return finished
 
     #THE REST OF THE FUNCTIONS ARE JUST USED FOR VISUALIZATIONS
 
@@ -214,6 +251,16 @@ class RRT():
         plt.draw()
         plt.pause(0.01)
 
+    def visualize_path(self, x_path, y_path):
+        '''
+        Used to see direct lines from origin to sample and sample to goal 
+        '''
+        x_path_array = np.array([x_path])
+        y_path_array = np.array([y_path])
+        self.path_line.set_data(x_path_array,y_path_array)
+        plt.draw()
+        plt.pause(0.01)
+
     
 
 
@@ -223,9 +270,11 @@ def main():
     #Static goal position  
     goal_position = np.array([100,100])
     goal_vertex = Vertex(goal_position)
+    goal_vertex.set_goal()
     #Static origin position
     origin_position = np.array([0,0])
     origin_vertex = Vertex(origin_position)
+    origin_vertex.set_origin()
 
     #Create graph were all vertices will be stored
     GRAPH = []
@@ -236,8 +285,8 @@ def main():
     rrt.visualize_start()
 
     i = 0
-
-    while i < 100:
+    finished_search = False
+    while finished_search == False:
         
         #generate a new point to sample
         new_point = rrt.generate_rand_point()
@@ -248,23 +297,12 @@ def main():
         # path_origin_point_feasible = rrt.check_path_feasibility(origin_vertex, new_point_vertex)
         # #Check and see if this new point can go directly to goal
         # path_point_goal_feasible = rrt.check_path_feasibility(new_point_vertex, goal_vertex)
-        Graph = rrt.extend(GRAPH, new_point_vertex)
+        if point_feasible:
+            GRAPH = rrt.extend(GRAPH, new_point_vertex)
+            finished_search = rrt.check_finished(GRAPH)
+
         
         rrt.visualize_random_point(new_point)
-        # rrt.visualize_branching()
-        # rrt.visualize_direct_path(new_point_vertex)
-        # if point_feasible:
-        #     print("POINT feasible")
-        # else:
-        #     print("POINT not feasible")
-        # if path_origin_point_feasible:
-        #     print("PATH ORIGIN -> POINT feasible")
-        # else:
-        #     print("PATH ORIGIN -> POINT not feasible")
-        # if path_point_goal_feasible:
-        #     print("PATH POINT -> GOAL feasible")
-        # else:
-        #     print("PATH POINT -> GOAL not feasible")
         
         print(" ")
         print("----------------------------------")
@@ -273,6 +311,24 @@ def main():
         input("Press the Enter key to continue: ")
         i+=1
 
+    #Trace the path back  to the start
+    back_to_start = False
+    graph_i = len(GRAPH)-1
+    path_x = []
+    path_y = []
+    while back_to_start == False:
+        path_x.append(GRAPH[graph_i].position[0])
+        path_y.append(GRAPH[graph_i].position[1])
+        graph_i = GRAPH[graph_i].closest_vertex_i
+        back_to_start = GRAPH[graph_i].origin
+    #Append Origin    
+    path_x.append(GRAPH[graph_i].position[0])
+    path_y.append(GRAPH[graph_i].position[1])
+    
+    print("Path x: ", path_x)
+    print("Path y: ", path_y)
+    rrt.visualize_path(path_x, path_y)
+    input("Press the Enter key to continue: ")
 
 if __name__ == "__main__":
     # Calling the main function if the script is executed directly
